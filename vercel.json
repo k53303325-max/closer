@@ -1,6 +1,7 @@
 {
+  "rewrites": [{ "source": "/api/telegram", "destination": "/" }],
   "functions": {
-    "api/telegram.py": {
+    "index.py": {
       "maxDuration": 30
     }
   }
