@@ -1,0 +1,69 @@
+{
+  "template": "uslugi",
+  "title": "Оказание услуг",
+  "version": 1,
+  "description": "Разовый договор оказания услуг и акт к нему. Один шаблон для любых сторон: физлицо, самозанятый, ИП, ООО.",
+  "documents": {
+    "contract": {
+      "file": "contract.docx",
+      "title": "Договор оказания услуг",
+      "fields": ["number", "date", "customer", "executor", "services", "term", "price", "vat", "payment",
+                 "customer_details", "executor_details", "customer_sign", "executor_sign"]
+    },
+    "act": {
+      "file": "act.docx",
+      "title": "Акт об оказании услуг",
+      "fields": ["date", "customer", "executor", "number", "contract_date", "services", "start", "end",
+                 "price", "vat", "customer_sign", "executor_sign"]
+    }
+  },
+  "fields": {
+    "number":           {"source": "system",  "format": "CL-YYYY-NNNNNN", "note": "номер договора; в акте — тот же номер"},
+    "date":             {"source": "system",  "format": "DD.MM.YYYY", "note": "договор — дата версии, отправленной на подпись; акт — дата создания акта"},
+    "contract_date":    {"source": "system",  "format": "DD.MM.YYYY", "note": "дата договора, к которому акт"},
+    "customer":         {"source": "profile", "builder": "parties.party_line(customer)"},
+    "executor":         {"source": "profile", "builder": "parties.party_line(executor)"},
+    "customer_details": {"source": "profile", "builder": "parties.party_details(customer)", "multiline": true},
+    "executor_details": {"source": "profile", "builder": "parties.party_details(executor)", "multiline": true},
+    "customer_sign":    {"source": "profile", "builder": "parties.sign_name(customer)"},
+    "executor_sign":    {"source": "profile", "builder": "parties.sign_name(executor)"},
+    "vat":              {"source": "profile", "builder": "parties.vat_text(executor)", "note": "пользователь не заполняет"},
+
+    "services": {
+      "source": "user", "ask": "Какие услуги? Опишите коротко.",
+      "llm": true, "type": "string", "max_len": 500,
+      "grammar": "продолжает фразу «оказывает услуги по …», дательный падеж: «разработке логотипа», «уборке квартиры»",
+      "example": "разработке логотипа и фирменного стиля"
+    },
+    "term": {
+      "source": "user", "ask": "К какому сроку нужно оказать услуги?",
+      "llm": true, "type": "string",
+      "normalize": "бот приводит к виду «до DD.MM.YYYY» или «с DD.MM.YYYY по DD.MM.YYYY»; «3 недели» считаются от сегодняшней даты",
+      "example": "до 30.11.2026"
+    },
+    "price": {
+      "source": "user", "ask": "Сколько стоят услуги, в рублях?",
+      "llm": true, "type": "integer_rub",
+      "format": "число с пробелами по тысячам, без «руб.» — слово «рублей» уже в шаблоне",
+      "example": "45 000"
+    },
+    "payment": {
+      "source": "user", "ask": "Как Заказчик платит?", "type": "choice", "buttons": true,
+      "options": {
+        "prepay":  "полностью в течение 3 дней после подписания Договора",
+        "postpay": "полностью в течение 3 дней после подписания Акта",
+        "split":   "50 % в течение 3 дней после подписания Договора, остальное – в течение 3 дней после подписания Акта"
+      },
+      "note": "значение подставляется дословно, как в списке шаблона"
+    },
+    "start": {
+      "source": "user_default", "default": "contract.date", "ask": "Когда начали оказывать услуги?",
+      "format": "DD.MM.YYYY", "note": "в акте; кнопка «Оставить» принимает значение по умолчанию"
+    },
+    "end": {
+      "source": "user_default", "default": "today", "ask": "Когда закончили?",
+      "format": "DD.MM.YYYY"
+    }
+  },
+  "act_copies_from_contract": ["number", "customer", "executor", "services", "price", "vat", "customer_sign", "executor_sign"]
+}
