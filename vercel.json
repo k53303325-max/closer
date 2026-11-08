@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PYTHONPATH": "."
+  },
   "rewrites": [{ "source": "/api/telegram", "destination": "/" }],
   "functions": {
     "index.py": {

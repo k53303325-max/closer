@@ -34,7 +34,13 @@ def build_dispatcher() -> tuple[Bot, Dispatcher]:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    storage = RedisStorage.from_url(settings.redis_url)
+    try:
+        storage = RedisStorage.from_url(settings.redis_url)
+    except Exception:
+        from aiogram.fsm.storage.memory import MemoryStorage
+
+        logger.warning("Redis unavailable, using in-memory FSM (dev only)")
+        storage = MemoryStorage()
     _dp = Dispatcher(storage=storage)
     _dp.update.middleware(DbSessionMiddleware())
     _dp.include_router(errors_router)
