@@ -2,11 +2,11 @@ from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
-from closer.texts import t
+from closer.bot.handlers.stage1_common import send_main_menu
 
 router = Router()
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer(t("start.welcome"))
+    await send_main_menu(message)

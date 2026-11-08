@@ -23,8 +23,7 @@ def build_stage1_dispatcher() -> Dispatcher:
 
 
 def bot_commands() -> list[BotCommand]:
-    keys = ("start", "new", "my", "profile", "help")
-    return [BotCommand(command=k, description=t(f"bot.commands.{k}")) for k in keys]
+    return [BotCommand(command="start", description=t("bot.commands.start"))]
 
 
 def build_stage1_bot(token: str) -> Bot:

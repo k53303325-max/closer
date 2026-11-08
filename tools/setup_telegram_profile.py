@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Этап 1: выставить описание и команды бота из texts/ru.yaml (запуск локально)."""
+"""Этап 1: описания и команда /start из texts/ru.yaml."""
 from __future__ import annotations
 
 import os
@@ -45,14 +45,11 @@ def main() -> None:
             json={"description": bot["description"]},
         )
         print("description", r.json())
-        cmds = [
-            {"command": k, "description": bot["commands"][k]}
-            for k in ("start", "new", "my", "profile", "help")
-        ]
+        cmds = [{"command": "start", "description": bot["commands"]["start"]}]
         r = c.post(API.format(token=token, method="setMyCommands"), json={"commands": cmds})
         print("commands", r.json())
 
-    print("Аватар и обложка — только через @BotFather: brand/avatar.png, brand/cover.png")
+    print("Фото: @BotFather — brand/avatar.png, brand/cover.png")
 
 
 if __name__ == "__main__":

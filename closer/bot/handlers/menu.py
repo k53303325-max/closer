@@ -1,27 +1,25 @@
-from aiogram import Router
-from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram import F, Router
+from aiogram.types import CallbackQuery
 
-from closer.texts import t
+from closer.bot.handlers.stage1_common import edit_or_answer_menu, send_help, send_soon
 
 router = Router()
 
 
-@router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
-    await message.answer(t("help.text"))
+@router.callback_query(F.data.in_({"menu:compose", "menu:my", "menu:profile"}))
+async def menu_soon(callback: CallbackQuery) -> None:
+    if callback.message:
+        await send_soon(callback.message)
+    await callback.answer()
 
 
-@router.message(Command("new"))
-async def cmd_new(message: Message) -> None:
-    await message.answer(t("bot.soon"))
+@router.callback_query(F.data == "menu:help")
+async def menu_help(callback: CallbackQuery) -> None:
+    if callback.message:
+        await send_help(callback.message)
+    await callback.answer()
 
 
-@router.message(Command("my"))
-async def cmd_my(message: Message) -> None:
-    await message.answer(t("bot.soon"))
-
-
-@router.message(Command("profile"))
-async def cmd_profile(message: Message) -> None:
-    await message.answer(t("bot.soon"))
+@router.callback_query(F.data == "menu:home")
+async def menu_home(callback: CallbackQuery) -> None:
+    await edit_or_answer_menu(callback)
