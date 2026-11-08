@@ -3,16 +3,9 @@ from __future__ import annotations
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import Update
 
-from closer.bot.errors import router as errors_router
-from closer.bot.handlers.menu import router as menu_router
-from closer.bot.handlers.onboarding import router as onboarding_router
-from closer.bot.handlers.start import router as start_router
-from closer.bot.middlewares import DbSessionMiddleware
+from closer.bot.stage1_polling import build_stage1_bot, build_stage1_dispatcher
 from closer.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -30,24 +23,9 @@ def build_dispatcher() -> tuple[Bot, Dispatcher]:
     if not settings.bot_token:
         raise RuntimeError("BOT_TOKEN is required")
 
-    _bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
-    try:
-        storage = RedisStorage.from_url(settings.redis_url)
-    except Exception:
-        from aiogram.fsm.storage.memory import MemoryStorage
-
-        logger.warning("Redis unavailable, using in-memory FSM (dev only)")
-        storage = MemoryStorage()
-    _dp = Dispatcher(storage=storage)
-    _dp.update.middleware(DbSessionMiddleware())
-    _dp.include_router(errors_router)
-    _dp.include_router(start_router)
-    _dp.include_router(onboarding_router)
-    _dp.include_router(menu_router)
-    logger.info("Dispatcher initialized")
+    _bot = build_stage1_bot(settings.bot_token)
+    _dp = build_stage1_dispatcher()
+    logger.info("Stage-1 dispatcher initialized")
     return _bot, _dp
 
 

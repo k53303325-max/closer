@@ -1,79 +1,58 @@
 #!/usr/bin/env python3
-"""Apply BotFather texts and avatar via Telegram Bot API (run locally)."""
+"""Этап 1: выставить описание и команды бота из texts/ru.yaml (запуск локально)."""
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
 
 import httpx
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
 API = "https://api.telegram.org/bot{token}/{method}"
 
-ABOUT = (
-    "Договор оказания услуг за 10 минут: опишите сделку, проверьте и подпишите кодом из СМС. "
-    "Первые 3 договора бесплатно."
-)
-DESCRIPTION = (
-    "Closer помогает заключить договор без бумаги и встреч.\n\n"
-    "1. Опишите сделку одним сообщением: что, сколько, к какому сроку.\n"
-    "2. Бот соберёт договор по шаблону юриста.\n"
-    "3. Отправьте ссылку второй стороне.\n"
-    "4. Обе стороны подписывают кодом из СМС.\n\n"
-    "Потом бот напомнит о сроке и поможет подписать акт.\n\n"
-    "Подходит для физлиц, самозанятых, ИП и компаний. Первые 3 договора бесплатно."
-)
-COMMANDS = [
-    ("start", "Начать"),
-    ("new", "Новый договор"),
-    ("my", "Мои договоры"),
-    ("profile", "Мой профиль"),
-    ("verify", "Проверить подлинность PDF"),
-    ("help", "Помощь"),
-]
+
+def load_texts() -> dict:
+    with (ROOT / "texts" / "ru.yaml").open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
-def main() -> None:
+def load_token() -> str:
     token = os.environ.get("BOT_TOKEN", "").strip()
     if not token and (ROOT / ".env").is_file():
         for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
             if line.startswith("BOT_TOKEN="):
                 token = line.split("=", 1)[1].strip()
     if not token:
-        raise SystemExit("BOT_TOKEN required")
+        raise SystemExit("BOT_TOKEN required in .env")
+    return token
+
+
+def main() -> None:
+    texts = load_texts()
+    bot = texts["bot"]
+    token = load_token()
 
     with httpx.Client(timeout=60.0) as c:
-        r = c.post(API.format(token=token, method="setMyShortDescription"), json={"short_description": ABOUT})
+        r = c.post(
+            API.format(token=token, method="setMyShortDescription"),
+            json={"short_description": bot["short_description"]},
+        )
         print("short_description", r.json())
-        r = c.post(API.format(token=token, method="setMyDescription"), json={"description": DESCRIPTION})
+        r = c.post(
+            API.format(token=token, method="setMyDescription"),
+            json={"description": bot["description"]},
+        )
         print("description", r.json())
-        cmds = [{"command": a, "description": b} for a, b in COMMANDS]
+        cmds = [
+            {"command": k, "description": bot["commands"][k]}
+            for k in ("start", "new", "my", "profile", "help")
+        ]
         r = c.post(API.format(token=token, method="setMyCommands"), json={"commands": cmds})
         print("commands", r.json())
 
-        avatar = ROOT / "brand" / "avatar.png"
-        if avatar.is_file():
-            with avatar.open("rb") as f:
-                r = c.post(
-                    API.format(token=token, method="setMyProfilePhoto"),
-                    files={"photo": ("avatar.png", f, "image/png")},
-                )
-            print("avatar", r.json())
-        else:
-            print("avatar skipped", avatar)
-
-        cover = ROOT / "brand" / "cover.png"
-        if cover.is_file():
-            with cover.open("rb") as f:
-                r = c.post(
-                    API.format(token=token, method="setMyDescriptionPhoto"),
-                    files={"photo": ("cover.png", f, "image/png")},
-                )
-            print("cover", r.json())
+    print("Аватар и обложка — только через @BotFather: brand/avatar.png, brand/cover.png")
 
 
 if __name__ == "__main__":
