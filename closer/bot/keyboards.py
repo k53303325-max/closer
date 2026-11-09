@@ -8,14 +8,15 @@ from aiogram.types import (
 from closer.texts import t
 
 
-def consent_keyboard(checked: bool) -> InlineKeyboardMarkup:
+def consent_keyboard(checked: bool, *, show_cancel: bool = False) -> InlineKeyboardMarkup:
     mark = "☑" if checked else "☐"
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=t("pep.toggle", mark=mark), callback_data="pep:toggle")],
-            [InlineKeyboardButton(text=t("pep.continue_btn"), callback_data="pep:continue")],
-        ]
-    )
+    rows = [
+        [InlineKeyboardButton(text=t("pep.toggle", mark=mark), callback_data="pep:toggle")],
+        [InlineKeyboardButton(text=t("pep.continue_btn"), callback_data="pep:continue")],
+    ]
+    if show_cancel:
+        rows.append([InlineKeyboardButton(text=t("compose.cancel"), callback_data="compose:cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def contact_keyboard() -> ReplyKeyboardMarkup:

@@ -30,7 +30,17 @@ class FakeLLM:
 
     async def classify_and_extract(self, user_text: str) -> ExtractResult:
         text = user_text.lower()
-        unsupported_hints = ("купить", "продать", "товар", "авто", "квартиру", "ремонт с материал")
+        unsupported_hints = (
+            "купить",
+            "продать",
+            "товар",
+            "авто",
+            "квартиру",
+            "недвижим",
+            "аренд",
+            "аренду",
+            "ипотек",
+        )
         if any(h in text for h in unsupported_hints):
             return {"supported": False, "reason": "unsupported_deal_type"}
 

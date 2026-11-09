@@ -66,6 +66,39 @@ class Consent(Base):
     accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    template_key: Mapped[str] = mapped_column(String(32), default="uslugi")
+    status: Mapped[str] = mapped_column(String(32), default="composing")  # composing | draft | deleted
+    contract_number: Mapped[str | None] = mapped_column(String(32))
+    user_role: Mapped[str | None] = mapped_column(String(16))  # executor | customer
+    deal: Mapped[dict] = mapped_column(JSONB, default=dict)
+    current_version: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+    versions: Mapped[list["DocumentVersion"]] = relationship(back_populates="document")
+
+
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+    __table_args__ = (UniqueConstraint("document_id", "version_no", name="uq_document_version_no"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    version_no: Mapped[int] = mapped_column(Integer)
+    values: Mapped[dict] = mapped_column(JSONB, default=dict)
+    pdf_storage_key: Mapped[str | None] = mapped_column(String(512))
+    pdf_sha256: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    document: Mapped[Document] = relationship(back_populates="versions")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
 

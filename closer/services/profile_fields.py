@@ -40,6 +40,20 @@ class ProfileDraft:
             return "payout_optional"
         return None
 
+    def next_field_for_compose(self, is_executor: bool) -> str | None:
+        if not self.status:
+            return "status"
+        for key in PROFILE_FIELDS[self.status]:
+            if getattr(self, key) in (None, ""):
+                return key
+        if is_executor and not self.bank and not self.sbp:
+            return "payout"
+        return None
+
+
+def compose_profile_ready(draft: ProfileDraft, is_executor: bool) -> bool:
+    return draft.next_field_for_compose(is_executor) is None and bool(draft.status)
+
 
 def draft_from_dict(raw: dict | None) -> ProfileDraft:
     raw = raw or {}

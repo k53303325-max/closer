@@ -17,12 +17,12 @@ async def on_error(event: ErrorEvent) -> bool:
     update = event.update
     if update.message:
         try:
-            await update.message.answer(t("common.error_generic"))
+            await update.message.answer(t("bot.error_generic"))
         except Exception:
             logger.exception("failed to send error reply")
     elif update.callback_query and update.callback_query.message:
         try:
-            await update.callback_query.message.answer(t("common.error_generic"))
+            await update.callback_query.message.answer(t("bot.error_generic"))
             await update.callback_query.answer()
         except Exception:
             logger.exception("failed to send error reply for callback")

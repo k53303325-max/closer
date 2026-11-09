@@ -1,0 +1,15 @@
+---
+description: Agent deploys without being asked after meaningful changes
+alwaysApply: true
+---
+
+# Deploy
+
+After completing feature work or fixes for Closer:
+
+1. Commit with a clear message (do not skip pre-commit hooks).
+2. `git push origin main` when the branch is main.
+3. If the change touches the webhook/API or Vercel config: run `vercel deploy --prod` from the repo root (with network permissions).
+4. Briefly tell the user what was deployed (commit hash, Vercel URL if applicable).
+
+Do not wait for the user to say "deploy" or "push".

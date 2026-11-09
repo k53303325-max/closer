@@ -6,7 +6,7 @@ from closer.bot.handlers.stage1_common import edit_or_answer_menu, send_help, se
 router = Router()
 
 
-@router.callback_query(F.data.in_({"menu:compose", "menu:my", "menu:profile"}))
+@router.callback_query(F.data.in_({"menu:my", "menu:profile"}))
 async def menu_soon(callback: CallbackQuery) -> None:
     if callback.message:
         await send_soon(callback.message)

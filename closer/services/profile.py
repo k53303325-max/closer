@@ -18,6 +18,12 @@ def get_cipher() -> FieldCipher:
     return FieldCipher(settings.pd_encryption_key)
 
 
+def profile_ready_for_contract(draft: ProfileDraft, is_executor: bool) -> bool:
+    from closer.services.profile_fields import compose_profile_ready
+
+    return compose_profile_ready(draft, is_executor)
+
+
 def profile_is_complete(draft: ProfileDraft) -> bool:
     if draft.next_field() not in (None, "email_optional", "payout_optional"):
         return False

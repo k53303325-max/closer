@@ -40,6 +40,7 @@ router = Router()
 async def send_pep_prompt(message: Message, state: FSMContext) -> None:
     offer = load_pep_offer()
     settings = get_settings()
+    data = await state.get_data()
     await state.set_state(OnboardingStates.pep)
     await state.update_data(pep_checked=False)
     text = t(
@@ -48,7 +49,10 @@ async def send_pep_prompt(message: Message, state: FSMContext) -> None:
         pep_version=offer.version,
         pd_url=settings.pd_policy_url,
     )
-    await message.answer(text, reply_markup=consent_keyboard(False))
+    await message.answer(
+        text,
+        reply_markup=consent_keyboard(False, show_cancel=data.get("flow") == "compose"),
+    )
     doc = FSInputFile(settings.pep_offer_path, filename="pep_offer.md")
     await message.answer_document(doc, caption=t("pep.full_doc_caption"))
 
@@ -58,7 +62,9 @@ async def pep_toggle(cb: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     checked = not bool(data.get("pep_checked"))
     await state.update_data(pep_checked=checked)
-    await cb.message.edit_reply_markup(reply_markup=consent_keyboard(checked))
+    await cb.message.edit_reply_markup(
+        reply_markup=consent_keyboard(checked, show_cancel=data.get("flow") == "compose")
+    )
     await cb.answer()
 
 
@@ -100,8 +106,18 @@ async def pep_continue(cb: CallbackQuery, state: FSMContext, session) -> None:
         doc_sha256=offer.sha256,
         pep_version=offer.version,
     )
+    flow = data.get("flow")
+    if flow == "compose" and user.phone:
+        from closer.bot.handlers.compose import compose_skip_contact_to_role
+
+        await compose_skip_contact_to_role(cb.message, state, session, user)
+        await cb.answer()
+        return
     await state.set_state(OnboardingStates.contact)
-    await cb.message.answer(t("contact.prompt"), reply_markup=contact_keyboard())
+    await cb.message.answer(
+        t("contact.prompt"),
+        reply_markup=contact_keyboard(),
+    )
     await cb.answer()
 
 
@@ -131,6 +147,13 @@ async def contact_shared(message: Message, state: FSMContext, session) -> None:
         payload={"phone_mask": phone[:4] + "***"},
     )
 
+    data = await state.get_data()
+    if data.get("flow") == "compose":
+        from closer.bot.handlers.compose import compose_after_contact
+
+        await compose_after_contact(message, state, session)
+        return
+
     await state.set_state(ProfileStates.filling)
     draft = await load_draft_from_db(session, user.id)
     await state.update_data(profile=draft.__dict__)
@@ -152,7 +175,7 @@ async def prompt_profile_step(
             await save_profile(session, user_id, draft)
         await message.answer(t("profile.done"))
         await state.clear()
-        from closer.bot.handlers.menu import send_main_menu
+        from closer.bot.handlers.stage1_common import send_main_menu
 
         await send_main_menu(message)
         return
@@ -312,6 +335,6 @@ async def resume_or_pep(message: Message, state: FSMContext, session) -> None:
         await state.update_data(profile=profile.__dict__, db_user_id=user.id)
         await prompt_profile_step(message, state, profile, session)
         return
-    from closer.bot.handlers.menu import send_main_menu
+    from closer.bot.handlers.stage1_common import send_main_menu
 
     await send_main_menu(message)
