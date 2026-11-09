@@ -31,7 +31,7 @@ async def main() -> None:
     dp = build_stage1_dispatcher()
 
     me = await bot.get_me()
-    logger.info("Bot @%s — этап 1 (polling)", me.username)
+    logger.info("Bot @%s — этапы 1–2 (polling)", me.username)
     await bot.set_my_commands(bot_commands())
     await bot.set_my_short_description(t("bot.short_description"))
     await bot.set_my_description(t("bot.description"))

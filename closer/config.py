@@ -59,37 +59,31 @@ class Settings(BaseSettings):
 
     webhook_url: str | None = Field(default=None, validation_alias="WEBHOOK_URL")
 
-    admin_tg_ids: list[int] = Field(default_factory=list, validation_alias="ADMIN_TG_IDS")
-    admin_tg_usernames: list[str] = Field(
-        default_factory=list,
-        validation_alias="ADMIN_TG_USERNAMES",
-    )
+    # Plain strings in .env (comma-separated); avoids pydantic JSON decode on list fields.
+    admin_tg_ids: str = Field(default="", validation_alias="ADMIN_TG_IDS")
+    admin_tg_usernames: str = Field(default="", validation_alias="ADMIN_TG_USERNAMES")
 
-    @field_validator("admin_tg_ids", mode="before")
-    @classmethod
-    def parse_admin_ids(cls, v: object) -> list[int]:
-        if v is None or v == "":
+    @staticmethod
+    def _parse_admin_ids(raw: str) -> list[int]:
+        if not raw:
             return []
-        if isinstance(v, list):
-            return [int(x) for x in v]
-        parts = [x.strip() for x in str(v).split(",") if x.strip()]
-        return [int(x) for x in parts if x.isdigit() or (x.startswith("-") and x[1:].isdigit())]
+        parts = [x.strip() for x in raw.split(",") if x.strip()]
+        out = []
+        for x in parts:
+            if x.isdigit() or (x.startswith("-") and x[1:].isdigit()):
+                out.append(int(x))
+        return out
 
-    @field_validator("admin_tg_usernames", mode="before")
-    @classmethod
-    def parse_admin_usernames(cls, v: object) -> list[str]:
-        if v is None or v == "":
+    @staticmethod
+    def _parse_admin_usernames(raw: str) -> list[str]:
+        if not raw:
             return []
-        if isinstance(v, list):
-            items = v
-        else:
-            items = [x.strip() for x in str(v).split(",") if x.strip()]
-        return [x.lstrip("@").lower() for x in items]
+        return [x.lstrip("@").lower() for x in raw.split(",") if x.strip()]
 
     def is_admin(self, tg_user_id: int, username: str | None) -> bool:
-        if tg_user_id in self.admin_tg_ids:
+        if tg_user_id in self._parse_admin_ids(self.admin_tg_ids):
             return True
-        if username and username.lstrip("@").lower() in self.admin_tg_usernames:
+        if username and username.lstrip("@").lower() in self._parse_admin_usernames(self.admin_tg_usernames):
             return True
         return False
 

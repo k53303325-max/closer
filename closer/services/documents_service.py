@@ -66,7 +66,9 @@ async def save_composing_state(session: AsyncSession, doc: Document, *, role: st
 
 
 async def soft_delete_document(session: AsyncSession, doc: Document) -> None:
-    from datetime import UTC, datetime
+    from datetime import datetime
+
+    from closer.compat import UTC
 
     doc.status = "deleted"
     doc.deleted_at = datetime.now(UTC)

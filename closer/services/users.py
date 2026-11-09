@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
+
+from closer.compat import UTC
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
