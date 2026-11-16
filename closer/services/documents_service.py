@@ -1,22 +1,32 @@
 from __future__ import annotations
 
+import logging
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from closer.config import get_settings
 from closer.db.models import Document, DocumentVersion, User
-from closer.documents.docx_fill import fill_docx, sha256, to_pdf
+from closer.documents.docx_fill import TemplateError, fill_docx, sha256, to_pdf
 from closer.integrations.storage import get_storage
 from closer.services.contract_build import build_contract_values, next_contract_number, party_from_draft
 from closer.services.draft_watermark import apply_draft_watermark
 from closer.services.profile_fields import ProfileDraft
 
+logger = logging.getLogger(__name__)
+
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "templates" / "uslugi"
 
 FREE_CONTRACTS = 3
+
+
+@dataclass
+class DraftFile:
+    path: Path
+    filename: str
+    media_type: str  # pdf | docx
 
 
 def free_contracts_left(user: User) -> int:
@@ -36,7 +46,9 @@ async def find_incomplete_document(session: AsyncSession, user_id: int) -> Docum
     )
 
 
-async def find_active_draft(session: AsyncSession, user_id: int, doc_id: int) -> Document | None:
+async def find_active_draft(session: AsyncSession, user_id: int, doc_id: int | None) -> Document | None:
+    if doc_id is None:
+        return None
     return await session.scalar(
         select(Document).where(
             Document.id == doc_id,
@@ -61,7 +73,7 @@ async def create_composing_document(
 async def save_composing_state(session: AsyncSession, doc: Document, *, role: str | None, deal: dict) -> None:
     if role:
         doc.user_role = role
-    doc.deal = deal
+    doc.deal = dict(deal)
     await session.flush()
 
 
@@ -74,12 +86,12 @@ async def soft_delete_document(session: AsyncSession, doc: Document) -> None:
     doc.deleted_at = datetime.now(UTC)
 
 
-async def render_draft_pdf(
+async def render_draft_file(
     session: AsyncSession,
     doc: Document,
     draft: ProfileDraft,
     phone: str,
-) -> tuple[DocumentVersion, Path]:
+) -> tuple[DocumentVersion, DraftFile]:
     if not doc.contract_number:
         doc.contract_number = await next_contract_number(session)
     user_party = party_from_draft(draft, phone)
@@ -87,24 +99,41 @@ async def render_draft_pdf(
         contract_number=doc.contract_number,
         user_party=user_party,
         user_role=doc.user_role or "executor",
-        deal=doc.deal,
+        deal=dict(doc.deal or {}),
     )
     doc.status = "draft"
     version_no = doc.current_version + 1
     doc.current_version = version_no
 
+    storage = get_storage()
+    key: str
+    digest: str
+    out_path: Path
+    media_type: str
+    filename: str
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         docx_path = tmp_path / "contract.docx"
         fill_docx(TEMPLATE_DIR / "contract.docx", values, docx_path)
-        raw_pdf = to_pdf(docx_path, tmp_path)
-        wm_pdf = tmp_path / "contract_wm.pdf"
-        apply_draft_watermark(raw_pdf, wm_pdf)
-
-        storage = get_storage()
-        key = f"drafts/{doc.owner_user_id}/{doc.id}/v{version_no}.pdf"
-        await storage.put_file(key, wm_pdf)
-        digest = sha256(wm_pdf)
+        try:
+            raw_pdf = to_pdf(docx_path, tmp_path)
+            wm_pdf = tmp_path / "contract_wm.pdf"
+            apply_draft_watermark(raw_pdf, wm_pdf)
+            key = f"drafts/{doc.owner_user_id}/{doc.id}/v{version_no}.pdf"
+            await storage.put_file(key, wm_pdf)
+            digest = sha256(wm_pdf)
+            out_path = Path(await storage.path_for(key))
+            media_type = "pdf"
+            filename = "contract_draft.pdf"
+        except (RuntimeError, TemplateError, OSError) as exc:
+            logger.warning("PDF draft skipped (%s), sending DOCX", exc)
+            key = f"drafts/{doc.owner_user_id}/{doc.id}/v{version_no}.docx"
+            await storage.put_file(key, docx_path)
+            digest = sha256(docx_path)
+            out_path = Path(await storage.path_for(key))
+            media_type = "docx"
+            filename = "contract_draft.docx"
 
     ver = DocumentVersion(
         document_id=doc.id,
@@ -115,11 +144,14 @@ async def render_draft_pdf(
     )
     session.add(ver)
     await session.flush()
-    local_path = Path(await storage.path_for(key))
-    return ver, local_path
+    return ver, DraftFile(path=out_path, filename=filename, media_type=media_type)
 
 
 async def bump_free_contract_usage(session: AsyncSession, user: User) -> None:
     if user.free_contracts_used < FREE_CONTRACTS:
         user.free_contracts_used += 1
         await session.flush()
+
+
+# backwards compat alias
+render_draft_pdf = render_draft_file

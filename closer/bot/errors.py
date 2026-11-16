@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import ErrorEvent
 
 from closer.texts import t
@@ -34,7 +35,10 @@ async def on_error(event: ErrorEvent) -> bool:
     elif update.callback_query and update.callback_query.message:
         try:
             await update.callback_query.message.answer(text)
-            await update.callback_query.answer()
+            try:
+                await update.callback_query.answer()
+            except TelegramBadRequest:
+                pass
         except Exception:
             logger.exception("failed to send error reply for callback")
     return True

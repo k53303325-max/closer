@@ -13,13 +13,16 @@ from closer.bot.compose_keyboards import (
     delete_confirm_keyboard,
     edit_fields_keyboard,
     payment_keyboard,
+    profile_basis_keyboard,
+    profile_status_keyboard,
+    profile_vat_keyboard,
     resume_keyboard,
     role_keyboard,
     with_cancel,
 )
 from closer.bot.handlers.onboarding import send_pep_prompt
 from closer.bot.handlers.stage1_common import send_main_menu
-from closer.bot.keyboards import contact_keyboard, remove_keyboard, signer_basis_keyboard, status_keyboard, vat_keyboard
+from closer.bot.keyboards import contact_keyboard, remove_keyboard
 from closer.bot.states import ComposeStates, OnboardingStates
 from closer.config import get_settings
 from closer.documents.parties import OOO, vat_text
@@ -322,6 +325,12 @@ async def _persist_deal(
 
 
 async def _start_profile_or_card(message: Message, state: FSMContext, session, user, doc) -> None:
+    if not doc:
+        doc_id = (await state.get_data()).get("document_id")
+        doc = await find_active_draft(session, user.id, doc_id)
+    if not doc:
+        doc = await create_composing_document(session, user.id)
+        await state.update_data(document_id=doc.id)
     is_executor = (doc.user_role if doc else "executor") == "executor"
     draft = await load_draft_from_db(session, user.id)
     if not profile_ready_for_contract(draft, is_executor):
@@ -335,19 +344,19 @@ async def _start_profile_or_card(message: Message, state: FSMContext, session, u
 async def _prompt_compose_profile(message: Message, draft: ProfileDraft, is_executor: bool) -> None:
     step = draft.next_field_for_compose(is_executor)
     prompts = {
-        "status": ("profile.ask_status", status_keyboard()),
+        "status": ("profile.ask_status", profile_status_keyboard()),
         "full_name": ("profile.ask_full_name", with_cancel([])),
         "passport": ("profile.ask_passport", with_cancel([])),
         "inn": ("profile.ask_inn", with_cancel([])),
         "ogrn": ("profile.ask_ogrn", with_cancel([])),
         "org_name": ("profile.ask_org_name", with_cancel([])),
         "signer_position": ("profile.ask_signer_position", with_cancel([])),
-        "signer_basis": ("profile.ask_signer_basis", signer_basis_keyboard()),
+        "signer_basis": ("profile.ask_signer_basis", profile_basis_keyboard()),
         "address": ("profile.ask_address", with_cancel([])),
-        "vat_mode": ("profile.ask_vat", vat_keyboard()),
+        "vat_mode": ("profile.ask_vat", profile_vat_keyboard()),
         "payout": ("compose.profile.payout", with_cancel([])),
     }
-    key, markup = prompts.get(step, ("profile.ask_status", status_keyboard()))
+    key, markup = prompts.get(step, ("profile.ask_status", profile_status_keyboard()))
     await message.answer(t(key), reply_markup=markup)
 
 
@@ -466,18 +475,22 @@ async def _build_card(message: Message, state: FSMContext, session, user, doc, d
     card = format_card_text(user_role=doc.user_role or "executor", deal=deal, vat_display=vat_disp, free_left=left)
 
     try:
-        ver, pdf_path = await render_draft_pdf(session, doc, draft, user.phone)
+        ver, draft_file = await render_draft_pdf(session, doc, draft, user.phone)
         if ver.version_no == 1:
             await bump_free_contract_usage(session, user)
     except Exception:
-        logger.exception("draft pdf failed")
+        logger.exception("draft build failed")
         await message.answer(t("compose.pdf_error"))
         return
 
     await state.set_state(ComposeStates.card)
     await state.update_data(deal=deal, document_id=doc.id)
+    caption = t("compose.card.docx_hint") if draft_file.media_type == "docx" else None
     await message.answer(card, reply_markup=card_keyboard())
-    await message.answer_document(FSInputFile(pdf_path, filename="contract_draft.pdf"))
+    await message.answer_document(
+        FSInputFile(draft_file.path, filename=draft_file.filename),
+        caption=caption,
+    )
 
 
 @router.callback_query(StateFilter(ComposeStates.card), F.data == "compose:card:sign")

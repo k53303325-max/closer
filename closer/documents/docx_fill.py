@@ -165,6 +165,10 @@ def to_pdf(docx: str | Path, out_dir: str | Path | None = None, timeout: int = 6
     out_dir = Path(out_dir or docx.parent)
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if not soffice:
+        mac_lo = Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
+        if mac_lo.is_file():
+            soffice = str(mac_lo)
+    if not soffice:
         raise RuntimeError("LibreOffice (soffice) is not installed")
     with tempfile.TemporaryDirectory() as profile:
         subprocess.run(

@@ -40,6 +40,37 @@ def payment_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def profile_status_keyboard() -> InlineKeyboardMarkup:
+    return with_cancel(
+        [
+            [InlineKeyboardButton(text=t("profile.status.individual"), callback_data="prof:st:individual")],
+            [InlineKeyboardButton(text=t("profile.status.self_employed"), callback_data="prof:st:self_employed")],
+            [InlineKeyboardButton(text=t("profile.status.ip"), callback_data="prof:st:ip")],
+            [InlineKeyboardButton(text=t("profile.status.ooo"), callback_data="prof:st:ooo")],
+        ]
+    )
+
+
+def profile_vat_keyboard() -> InlineKeyboardMarkup:
+    return with_cancel(
+        [
+            [InlineKeyboardButton(text=t("profile.vat.none"), callback_data="prof:vat:none")],
+            [InlineKeyboardButton(text=t("profile.vat.vat22"), callback_data="prof:vat:vat22")],
+            [InlineKeyboardButton(text=t("profile.vat.vat7"), callback_data="prof:vat:vat7")],
+            [InlineKeyboardButton(text=t("profile.vat.vat5"), callback_data="prof:vat:vat5")],
+        ]
+    )
+
+
+def profile_basis_keyboard() -> InlineKeyboardMarkup:
+    return with_cancel(
+        [
+            [InlineKeyboardButton(text=t("profile.basis.charter"), callback_data="prof:basis:Устава")],
+            [InlineKeyboardButton(text=t("profile.basis.poa"), callback_data="prof:basis:доверенности")],
+        ]
+    )
+
+
 def card_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

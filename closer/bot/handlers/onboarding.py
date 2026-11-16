@@ -85,17 +85,18 @@ async def pep_continue(cb: CallbackQuery, state: FSMContext, session) -> None:
     offer = load_pep_offer()
     settings = get_settings()
     now = datetime.now(UTC)
-    for kind in ("pep_offer", "pd_policy"):
-        session.add(
-            Consent(
-                user_id=user.id,
-                kind=kind,
-                doc_version=offer.version if kind == "pep_offer" else "pd_policy_v0",
-                doc_sha256=offer.sha256 if kind == "pep_offer" else "0" * 64,
-                accepted_at=now,
+    if not await user_has_pep_consent(session, user.id, settings.pep_offer_version):
+        for kind in ("pep_offer", "pd_policy"):
+            session.add(
+                Consent(
+                    user_id=user.id,
+                    kind=kind,
+                    doc_version=offer.version if kind == "pep_offer" else "pd_policy_v0",
+                    doc_sha256=offer.sha256 if kind == "pep_offer" else "0" * 64,
+                    accepted_at=now,
+                )
             )
-        )
-    await append_audit(
+        await append_audit(
         session,
         event="offer_accepted",
         actor_user_id=user.id,
@@ -105,9 +106,9 @@ async def pep_continue(cb: CallbackQuery, state: FSMContext, session) -> None:
             "pep_version": offer.version,
             "pd_policy_url": settings.pd_policy_url,
         },
-        doc_sha256=offer.sha256,
-        pep_version=offer.version,
-    )
+            doc_sha256=offer.sha256,
+            pep_version=offer.version,
+        )
     flow = data.get("flow")
     if flow == "compose" and user.phone:
         from closer.bot.handlers.compose import compose_skip_contact_to_role

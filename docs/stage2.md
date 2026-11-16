@@ -4,13 +4,18 @@
 
 ```bash
 cd "/Users/mark/Desktop/Проекты/Closer"
+```
+
+**Без Docker (Mac):** в `.env` добавьте `USE_SQLITE=1`, установите `aiosqlite`. Таблицы создадутся в `data/closer.db` при старте бота.
+
+**С Docker:**
+```bash
 docker compose up -d postgres
 alembic upgrade head
-# PD_ENCRYPTION_KEY и DATABASE_URL в .env
 docker compose up bot
 ```
 
-Локально без Docker: PostgreSQL + LibreOffice (`soffice`) для PDF.
+Для PDF нужен LibreOffice (`soffice` или приложение LibreOffice в `/Applications`).
 
 ## Сценарий проверки
 
