@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 
 from closer.bot.stage1_polling import bot_commands, build_stage1_bot, build_stage1_dispatcher
+from closer.db.init_db import ensure_schema
+from closer.db.session import _engine
 from closer.texts import t
 
 
@@ -26,6 +28,8 @@ async def main() -> None:
     token = _bot_token()
     if not token:
         raise SystemExit("BOT_TOKEN is required")
+
+    await ensure_schema(_engine)
 
     bot = build_stage1_bot(token)
     dp = build_stage1_dispatcher()

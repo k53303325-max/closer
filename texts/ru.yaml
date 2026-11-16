@@ -17,6 +17,7 @@ bot:
   soon: "Скоро будет"
   use_menu: "Выберите действие в меню"
   error_generic: "Не получилось обработать запрос. Нажмите /start или «В главное меню»."
+  db_unavailable: "База данных недоступна. Запустите PostgreSQL (docker compose up -d postgres) или в .env укажите USE_SQLITE=1 и перезапустите бота."
   commands:
     start: "Главное меню"
 

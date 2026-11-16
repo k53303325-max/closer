@@ -22,7 +22,17 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://closer:closer@localhost:5432/closer",
         validation_alias="DATABASE_URL",
     )
+    use_sqlite: bool = Field(default=False, validation_alias="USE_SQLITE")
     redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
+
+    @field_validator("use_sqlite", mode="before")
+    @classmethod
+    def parse_bool(cls, v: object) -> bool:
+        if isinstance(v, bool):
+            return v
+        if v is None or v == "":
+            return False
+        return str(v).strip().lower() in ("1", "true", "yes", "on")
 
     gigachat_auth_key: str | None = Field(default=None, validation_alias="GIGACHAT_AUTH_KEY")
 
@@ -91,6 +101,15 @@ class Settings(BaseSettings):
     @classmethod
     def parse_path(cls, v: object) -> Path:
         return Path(v) if not isinstance(v, Path) else v
+
+
+def resolve_database_url(settings: Settings | None = None) -> str:
+    settings = settings or get_settings()
+    if settings.use_sqlite:
+        db = settings.local_storage_path / "closer.db"
+        db.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite+aiosqlite:///{db.resolve()}"
+    return settings.database_url
 
 
 @lru_cache

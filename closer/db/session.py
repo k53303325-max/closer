@@ -4,9 +4,11 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from closer.config import get_settings
+from closer.config import get_settings, resolve_database_url
 
-_engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+_url = resolve_database_url()
+_connect_args = {"check_same_thread": False} if _url.startswith("sqlite") else {}
+_engine = create_async_engine(_url, pool_pre_ping=True, connect_args=_connect_args)
 SessionLocal = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
 

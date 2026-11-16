@@ -6,7 +6,7 @@ from typing import List, Optional
 from closer.compat import UTC
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from closer.db.json_type import JsonDict
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -78,7 +78,7 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(32), default="composing")  # composing | draft | deleted
     contract_number: Mapped[Optional[str]] = mapped_column(String(32))
     user_role: Mapped[Optional[str]] = mapped_column(String(16))  # executor | customer
-    deal: Mapped[dict] = mapped_column(JSONB, default=dict)
+    deal: Mapped[dict] = mapped_column(JsonDict, default=dict)
     current_version: Mapped[int] = mapped_column(Integer, default=0)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
@@ -94,7 +94,7 @@ class DocumentVersion(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
     version_no: Mapped[int] = mapped_column(Integer)
-    values: Mapped[dict] = mapped_column(JSONB, default=dict)
+    values: Mapped[dict] = mapped_column(JsonDict, default=dict)
     pdf_storage_key: Mapped[Optional[str]] = mapped_column(String(512))
     pdf_sha256: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
@@ -109,7 +109,7 @@ class AuditLog(Base):
     document_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
     event: Mapped[str] = mapped_column(String(64), index=True)
     actor_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    payload: Mapped[dict] = mapped_column(JsonDict, default=dict)
     doc_sha256: Mapped[Optional[str]] = mapped_column(String(64))
     prev_hash: Mapped[str] = mapped_column(String(64))
     record_hash: Mapped[str] = mapped_column(String(64))
