@@ -283,7 +283,7 @@ async def ask_field_text(message: Message, state: FSMContext, session) -> None:
         await message.answer(t("compose.use_buttons"))
         return
 
-    await _persist_deal(session, message, state, deal)
+    await _persist_deal(message, state, session, deal)
 
 
 @router.callback_query(StateFilter(ComposeStates.ask_field), F.data.startswith("compose:pay:"))
