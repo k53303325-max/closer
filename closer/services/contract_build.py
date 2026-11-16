@@ -16,7 +16,7 @@ from closer.texts import t
 
 OTHER_PARTY_LINE = "заполнит вторая сторона"
 OTHER_PARTY_DETAILS = "будет заполнено второй стороной"
-OTHER_PARTY_SIGN = " "
+OTHER_PARTY_SIGN = "—"
 
 
 def party_from_draft(draft: ProfileDraft, phone: str) -> Party:
