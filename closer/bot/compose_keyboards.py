@@ -98,8 +98,8 @@ def delete_confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text=t("compose.delete.yes"), callback_data="compose:delete:yes"),
-                InlineKeyboardButton(text=t("compose.delete.no"), callback_data="compose:delete:no"),
+                InlineKeyboardButton(text=t("compose.delete.confirm_yes"), callback_data="compose:delete:yes"),
+                InlineKeyboardButton(text=t("compose.delete.confirm_no"), callback_data="compose:delete:no"),
             ],
         ]
     )
