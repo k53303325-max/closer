@@ -75,7 +75,7 @@ def card_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("compose.card.edit"), callback_data="compose:card:edit")],
-            [InlineKeyboardButton(text=t("compose.card.sign"), callback_data="compose:card:sign")],
+            [InlineKeyboardButton(text=t("stage3.send.btn"), callback_data="compose:card:send")],
             [InlineKeyboardButton(text=t("compose.card.delete"), callback_data="compose:card:delete")],
             [InlineKeyboardButton(text=t("menu.home"), callback_data="menu:home")],
         ]

@@ -75,9 +75,13 @@ class Document(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     template_key: Mapped[str] = mapped_column(String(32), default="uslugi")
-    status: Mapped[str] = mapped_column(String(32), default="composing")  # composing | draft | deleted
+    status: Mapped[str] = mapped_column(String(32), default="composing")
     contract_number: Mapped[Optional[str]] = mapped_column(String(32))
     user_role: Mapped[Optional[str]] = mapped_column(String(16))  # executor | customer
+    counterparty_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    invite_token_hash: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
+    invite_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    change_request: Mapped[dict] = mapped_column(JsonDict, default=dict)
     deal: Mapped[dict] = mapped_column(JsonDict, default=dict)
     current_version: Mapped[int] = mapped_column(Integer, default=0)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -100,6 +104,25 @@ class DocumentVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     document: Mapped[Document] = relationship(back_populates="versions")
+
+
+class Signature(Base):
+    __tablename__ = "signatures"
+    __table_args__ = (UniqueConstraint("document_id", "version_no", "user_id", name="uq_sign_doc_ver_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    version_no: Mapped[int] = mapped_column(Integer)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    role: Mapped[str] = mapped_column(String(16))
+    signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    pdf_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    otp_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    otp_locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_code_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    sms_sent_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class AuditLog(Base):

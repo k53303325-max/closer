@@ -31,7 +31,10 @@ async def append_audit(
     if pep_version:
         payload.setdefault("pep_version", pep_version)
 
-    last = await session.scalar(select(AuditLog).order_by(AuditLog.id.desc()).limit(1))
+    q = select(AuditLog).order_by(AuditLog.id.desc()).limit(1)
+    if document_id is not None:
+        q = select(AuditLog).where(AuditLog.document_id == document_id).order_by(AuditLog.id.desc()).limit(1)
+    last = await session.scalar(q)
     prev_hash = last.record_hash if last else "0" * 64
 
     record = {

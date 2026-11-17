@@ -48,6 +48,36 @@ async def next_contract_number(session: AsyncSession, year: int | None = None) -
     return f"{prefix}{n:06d}"
 
 
+def counterparty_role(initiator_role: str) -> str:
+    return "customer" if initiator_role == "executor" else "executor"
+
+
+def build_contract_values_dual(
+    *,
+    contract_number: str,
+    customer: Party,
+    executor: Party,
+    deal: dict,
+) -> dict[str, str]:
+    payment_key = deal.get("payment")
+    payment = payment_contract_text(payment_key) if payment_key else ""
+    return {
+        "number": contract_number,
+        "date": format_contract_date(),
+        "customer": party_line(customer),
+        "executor": party_line(executor),
+        "services": deal.get("services") or "",
+        "term": deal.get("term") or "",
+        "price": format_price_rub(int(deal["price"])) if deal.get("price") else "",
+        "vat": vat_text(executor),
+        "payment": payment,
+        "customer_details": party_details(customer),
+        "executor_details": party_details(executor),
+        "customer_sign": sign_name(customer),
+        "executor_sign": sign_name(executor),
+    }
+
+
 def build_contract_values(
     *,
     contract_number: str,

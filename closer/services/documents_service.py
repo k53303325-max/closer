@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from closer.db.models import Document, DocumentVersion, User
 from closer.documents.docx_fill import TemplateError, fill_docx, sha256, to_pdf
 from closer.integrations.storage import get_storage
-from closer.services.contract_build import build_contract_values, next_contract_number, party_from_draft
+from closer.services.contract_build import (
+    build_contract_values,
+    build_contract_values_dual,
+    next_contract_number,
+    party_from_draft,
+)
 from closer.services.draft_watermark import apply_draft_watermark
 from closer.services.profile_fields import ProfileDraft
 
@@ -151,6 +156,59 @@ async def bump_free_contract_usage(session: AsyncSession, user: User) -> None:
     if user.free_contracts_used < FREE_CONTRACTS:
         user.free_contracts_used += 1
         await session.flush()
+
+
+async def render_final_contract(
+    session: AsyncSession,
+    doc: Document,
+    customer_draft: ProfileDraft,
+    customer_phone: str,
+    executor_draft: ProfileDraft,
+    executor_phone: str,
+) -> tuple[DocumentVersion, DraftFile]:
+    customer = party_from_draft(customer_draft, customer_phone)
+    executor = party_from_draft(executor_draft, executor_phone)
+    values = build_contract_values_dual(
+        contract_number=doc.contract_number or await next_contract_number(session),
+        customer=customer,
+        executor=executor,
+        deal=dict(doc.deal or {}),
+    )
+    if not doc.contract_number:
+        doc.contract_number = values["number"]
+    version_no = doc.current_version + 1
+    doc.current_version = version_no
+    storage = get_storage()
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        docx_path = tmp_path / "contract.docx"
+        fill_docx(TEMPLATE_DIR / "contract.docx", values, docx_path)
+        try:
+            raw_pdf = to_pdf(docx_path, tmp_path)
+            key = f"contracts/{doc.id}/v{version_no}.pdf"
+            await storage.put_file(key, raw_pdf)
+            digest = sha256(raw_pdf)
+            out_path = Path(await storage.path_for(key))
+            media_type = "pdf"
+            filename = "contract.pdf"
+        except (RuntimeError, TemplateError, OSError) as exc:
+            logger.warning("final PDF skipped (%s), DOCX", exc)
+            key = f"contracts/{doc.id}/v{version_no}.docx"
+            await storage.put_file(key, docx_path)
+            digest = sha256(docx_path)
+            out_path = Path(await storage.path_for(key))
+            media_type = "docx"
+            filename = "contract.docx"
+    ver = DocumentVersion(
+        document_id=doc.id,
+        version_no=version_no,
+        values=values,
+        pdf_storage_key=key,
+        pdf_sha256=digest,
+    )
+    session.add(ver)
+    await session.flush()
+    return ver, DraftFile(path=out_path, filename=filename, media_type=media_type)
 
 
 # backwards compat alias

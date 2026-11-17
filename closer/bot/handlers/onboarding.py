@@ -116,6 +116,16 @@ async def pep_continue(cb: CallbackQuery, state: FSMContext, session) -> None:
         await compose_skip_contact_to_role(cb.message, state, session, user)
         await cb.answer()
         return
+    if flow == "invite":
+        if user.phone:
+            from closer.bot.invite_review import deliver_invite_review
+
+            await deliver_invite_review(cb.message, state, session, user)
+        else:
+            await state.set_state(OnboardingStates.contact)
+            await cb.message.answer(t("contact.prompt"), reply_markup=contact_keyboard())
+        await cb.answer()
+        return
     await state.set_state(OnboardingStates.contact)
     await cb.message.answer(
         t("contact.prompt"),
@@ -155,6 +165,15 @@ async def contact_shared(message: Message, state: FSMContext, session) -> None:
         from closer.bot.handlers.compose import compose_after_contact
 
         await compose_after_contact(message, state, session)
+        return
+    if data.get("flow") == "invite":
+        from closer.bot.invite_review import deliver_invite_review
+
+        await message.answer(t("contact.saved"), reply_markup=remove_keyboard())
+        user = await get_or_create_user(
+            session, tg_user_id=message.from_user.id, tg_username=message.from_user.username
+        )
+        await deliver_invite_review(message, state, session, user)
         return
 
     await state.set_state(ProfileStates.filling)

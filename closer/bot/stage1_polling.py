@@ -11,6 +11,7 @@ from closer.bot.handlers.compose import router as compose_router
 from closer.bot.handlers.fallback import router as fallback_router
 from closer.bot.handlers.menu import router as menu_router
 from closer.bot.handlers.onboarding import router as onboarding_router
+from closer.bot.handlers.stage3 import router as stage3_router
 from closer.bot.handlers.start import router as start_router
 from closer.bot.middlewares import DbSessionMiddleware
 from closer.texts import t
@@ -23,6 +24,7 @@ def build_stage1_dispatcher() -> Dispatcher:
     dp.include_router(start_router)
     dp.include_router(compose_router)
     dp.include_router(onboarding_router)
+    dp.include_router(stage3_router)
     dp.include_router(menu_router)
     dp.include_router(fallback_router)
     return dp

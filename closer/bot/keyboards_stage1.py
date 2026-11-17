@@ -11,7 +11,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text=t("menu.my"), callback_data="menu:my"),
                 InlineKeyboardButton(text=t("menu.profile"), callback_data="menu:profile"),
             ],
-            [InlineKeyboardButton(text=t("menu.help"), callback_data="menu:help")],
+            [
+                InlineKeyboardButton(text=t("menu.help"), callback_data="menu:help"),
+                InlineKeyboardButton(text=t("menu.verify"), callback_data="menu:verify"),
+            ],
         ]
     )
 

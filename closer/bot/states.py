@@ -20,3 +20,19 @@ class ComposeStates(StatesGroup):
     edit_pick = State()
     edit_value = State()
     delete_confirm = State()
+
+
+class InviteStates(StatesGroup):
+    onboarding_gate = State()
+    contact = State()
+    profile = State()
+    review = State()
+
+
+class SignStates(StatesGroup):
+    await_code = State()
+    verify_upload = State()
+
+
+class ChangeStates(StatesGroup):
+    enter_value = State()

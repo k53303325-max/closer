@@ -23,13 +23,12 @@ from closer.bot.compose_keyboards import (
 from closer.bot.handlers.onboarding import send_pep_prompt
 from closer.bot.handlers.stage1_common import send_main_menu
 from closer.bot.keyboards import contact_keyboard, remove_keyboard
-from closer.bot.states import ComposeStates, OnboardingStates
+from closer.bot.states import ComposeStates, InviteStates, OnboardingStates
 from closer.config import get_settings
 from closer.documents.parties import OOO, vat_text
 from closer.integrations.gigachat import get_llm_client
 from closer.services.contract_build import format_card_text, party_from_draft
 from closer.services.documents_service import (
-    bump_free_contract_usage,
     create_composing_document,
     find_active_draft,
     find_incomplete_document,
@@ -360,7 +359,20 @@ async def _prompt_compose_profile(message: Message, draft: ProfileDraft, is_exec
     await message.answer(t(key), reply_markup=markup)
 
 
-@router.callback_query(StateFilter(ComposeStates.profile), F.data.startswith("prof:st:"))
+async def _finish_profile_if_invite(message: Message, state: FSMContext, session, user, draft: ProfileDraft) -> bool:
+    data = await state.get_data()
+    if data.get("flow") != "invite":
+        return False
+    is_executor = data.get("is_executor", True)
+    if not compose_profile_ready(draft, is_executor):
+        return False
+    from closer.bot.invite_review import deliver_invite_review
+
+    await deliver_invite_review(message, state, session, user)
+    return True
+
+
+@router.callback_query(StateFilter(ComposeStates.profile, InviteStates.profile), F.data.startswith("prof:st:"))
 async def compose_prof_status(cb: CallbackQuery, state: FSMContext, session) -> None:
     status = cb.data.split(":")[-1]
     draft = draft_from_dict((await state.get_data()).get("profile"))
@@ -372,11 +384,14 @@ async def compose_prof_status(cb: CallbackQuery, state: FSMContext, session) -> 
     await save_profile(session, user.id, draft)
     is_executor = (await state.get_data()).get("is_executor", True)
     await cb.message.answer(t("compose.profile.status_hint"))
+    if await _finish_profile_if_invite(cb.message, state, session, user, draft):
+        await cb.answer()
+        return
     await _prompt_compose_profile(cb.message, draft, is_executor)
     await cb.answer()
 
 
-@router.callback_query(StateFilter(ComposeStates.profile), F.data.startswith("prof:vat:"))
+@router.callback_query(StateFilter(ComposeStates.profile, InviteStates.profile), F.data.startswith("prof:vat:"))
 async def compose_prof_vat(cb: CallbackQuery, state: FSMContext, session) -> None:
     draft = draft_from_dict((await state.get_data()).get("profile"))
     draft.vat_mode = cb.data.split(":")[-1]
@@ -386,11 +401,14 @@ async def compose_prof_vat(cb: CallbackQuery, state: FSMContext, session) -> Non
     await save_profile(session, user.id, draft)
     await state.update_data(profile=draft.__dict__)
     is_executor = (await state.get_data()).get("is_executor", True)
+    if await _finish_profile_if_invite(cb.message, state, session, user, draft):
+        await cb.answer()
+        return
     await _prompt_compose_profile(cb.message, draft, is_executor)
     await cb.answer()
 
 
-@router.callback_query(StateFilter(ComposeStates.profile), F.data.startswith("prof:basis:"))
+@router.callback_query(StateFilter(ComposeStates.profile, InviteStates.profile), F.data.startswith("prof:basis:"))
 async def compose_prof_basis(cb: CallbackQuery, state: FSMContext, session) -> None:
     draft = draft_from_dict((await state.get_data()).get("profile"))
     draft.signer_basis = cb.data.split(":", 2)[-1]
@@ -400,11 +418,14 @@ async def compose_prof_basis(cb: CallbackQuery, state: FSMContext, session) -> N
     await save_profile(session, user.id, draft)
     await state.update_data(profile=draft.__dict__)
     is_executor = (await state.get_data()).get("is_executor", True)
+    if await _finish_profile_if_invite(cb.message, state, session, user, draft):
+        await cb.answer()
+        return
     await _prompt_compose_profile(cb.message, draft, is_executor)
     await cb.answer()
 
 
-@router.message(StateFilter(ComposeStates.profile), F.text)
+@router.message(StateFilter(ComposeStates.profile, InviteStates.profile), F.text)
 async def compose_prof_text(message: Message, state: FSMContext, session) -> None:
     _ = get_cipher()
     data = await state.get_data()
@@ -453,6 +474,8 @@ async def compose_prof_text(message: Message, state: FSMContext, session) -> Non
     await state.update_data(profile=draft.__dict__)
 
     if compose_profile_ready(draft, is_executor):
+        if await _finish_profile_if_invite(message, state, session, user, draft):
+            return
         doc_id = data.get("document_id")
         doc = await find_active_draft(session, user.id, doc_id)
         await _build_card(message, state, session, user, doc, draft)
@@ -476,8 +499,6 @@ async def _build_card(message: Message, state: FSMContext, session, user, doc, d
 
     try:
         ver, draft_file = await render_draft_pdf(session, doc, draft, user.phone)
-        if ver.version_no == 1:
-            await bump_free_contract_usage(session, user)
     except Exception:
         logger.exception("draft build failed")
         await message.answer(t("compose.pdf_error"))
