@@ -64,6 +64,19 @@ async def find_active_draft(session: AsyncSession, user_id: int, doc_id: int | N
     )
 
 
+async def find_owner_sendable_draft(
+    session: AsyncSession,
+    user_id: int,
+    doc_id: int | None = None,
+) -> Document | None:
+    """Draft the owner can send or edit (by explicit id or latest incomplete)."""
+    if doc_id is not None:
+        by_id = await find_active_draft(session, user_id, doc_id)
+        if by_id:
+            return by_id
+    return await find_incomplete_document(session, user_id)
+
+
 async def create_composing_document(
     session: AsyncSession,
     user_id: int,

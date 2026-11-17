@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile, Message
@@ -507,17 +507,19 @@ async def _build_card(message: Message, state: FSMContext, session, user, doc, d
     await state.set_state(ComposeStates.card)
     await state.update_data(deal=deal, document_id=doc.id)
     caption = t("compose.card.docx_hint") if draft_file.media_type == "docx" else None
-    await message.answer(card, reply_markup=card_keyboard())
+    await message.answer(card, reply_markup=card_keyboard(doc.id))
     await message.answer_document(
         FSInputFile(draft_file.path, filename=draft_file.filename),
         caption=caption,
     )
 
 
-@router.callback_query(StateFilter(ComposeStates.card), F.data == "compose:card:sign")
-async def card_sign(cb: CallbackQuery) -> None:
-    await cb.message.answer(t("bot.soon"), reply_markup=card_keyboard())
-    await cb.answer()
+@router.callback_query(F.data == "compose:card:sign")
+async def card_sign_legacy(cb: CallbackQuery, state: FSMContext, session, bot: Bot) -> None:
+    """Old inline buttons from messages before stage 3."""
+    from closer.bot.handlers.stage3 import send_invite_from_card
+
+    await send_invite_from_card(cb, state, session, bot, doc_id=None)
 
 
 @router.callback_query(F.data == "compose:card:edit")
@@ -619,7 +621,8 @@ async def delete_yes(cb: CallbackQuery, state: FSMContext, session) -> None:
 @router.callback_query(StateFilter(ComposeStates.delete_confirm), F.data == "compose:delete:no")
 async def delete_no(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ComposeStates.card)
-    await cb.message.answer(t("compose.delete.kept"), reply_markup=card_keyboard())
+    data = await state.get_data()
+    await cb.message.answer(t("compose.delete.kept"), reply_markup=card_keyboard(data.get("document_id")))
     await cb.answer()
 
 

@@ -36,7 +36,7 @@ from closer.services.contract_build import counterparty_role
 from closer.services.contracts_list import STATUS_LABELS, list_user_documents
 from closer.services.documents_service import (
     bump_free_contract_usage,
-    find_active_draft,
+    find_owner_sendable_draft,
     free_contracts_left,
     render_final_contract,
     save_composing_state,
@@ -54,6 +54,52 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 CHANGE_FIELDS = ("services", "term", "price", "payment")
+
+
+def _parse_doc_id_from_send_callback(data: str, state_data: dict) -> int | None:
+    parts = data.split(":")
+    if len(parts) >= 4 and parts[-1].isdigit():
+        return int(parts[-1])
+    raw = state_data.get("document_id")
+    return int(raw) if raw is not None else None
+
+
+async def send_invite_from_card(
+    cb: CallbackQuery,
+    state: FSMContext,
+    session,
+    bot: Bot,
+    *,
+    doc_id: int | None = None,
+) -> None:
+    data = await state.get_data()
+    if doc_id is None:
+        doc_id = _parse_doc_id_from_send_callback(cb.data or "", data)
+    user = await get_or_create_user(session, tg_user_id=cb.from_user.id, tg_username=cb.from_user.username)
+    doc = await find_owner_sendable_draft(session, user.id, doc_id)
+    if not doc or doc.status not in ("draft", "composing"):
+        await cb.answer(t("stage3.send.not_ready"), show_alert=True)
+        return
+    if free_contracts_left(user) <= 0:
+        await cb.answer(t("billing.soon", price=get_settings().contract_price_rub), show_alert=True)
+        return
+    token, _ = await create_invite(session, doc, user.id)
+    await bump_free_contract_usage(session, user)
+    me = await bot.get_me()
+    link = invite_link(me.username or "", token)
+    deal = doc.deal or {}
+    prof = await load_draft_from_db(session, user.id)
+    name = prof.full_name or cb.from_user.full_name or "—"
+    price = format_price_rub(int(deal["price"])) if deal.get("price") else "—"
+    share = t("stage3.send.share_text", name=name, services=deal.get("services", "—"), price=price, link=link)
+    await cb.message.answer(t("stage3.send.done", link=link))
+    await cb.message.answer(share)
+    await state.update_data(flow="compose", document_id=doc.id, deal=deal)
+    try:
+        await cb.message.edit_reply_markup(reply_markup=send_invite_card_keyboard())
+    except Exception:
+        logger.debug("could not edit card markup", exc_info=True)
+    await cb.answer()
 
 
 async def _doc_for_user(session, user: User, doc_id: int | None) -> Document | None:
@@ -135,45 +181,30 @@ async def invite_decline(cb: CallbackQuery, state: FSMContext, session) -> None:
     data = await state.get_data()
     doc = await session.get(Document, data.get("document_id"))
     if doc:
+        cp_user = await get_or_create_user(session, tg_user_id=cb.from_user.id, tg_username=cb.from_user.username)
         doc.status = "declined"
         initiator = await session.get(User, doc.owner_user_id)
         if initiator and initiator.tg_user_id:
-            cp_user = await get_or_create_user(session, tg_user_id=cb.from_user.id, tg_username=cb.from_user.username)
             name = (await load_draft_from_db(session, cp_user.id)).full_name or cb.from_user.full_name or "Пользователь"
             try:
                 await cb.bot.send_message(initiator.tg_user_id, t("stage3.declined", name=name))
             except Exception:
                 logger.exception("notify decline")
-        await append_audit(session, document_id=doc.id, event="declined", actor_user_id=cb.from_user.id, payload={})
+        await append_audit(
+            session,
+            document_id=doc.id,
+            event="declined",
+            actor_user_id=cp_user.id,
+            payload={},
+        )
     await state.clear()
     await send_main_menu(cb.message)
     await cb.answer()
 
 
-@router.callback_query(F.data == "compose:card:send")
+@router.callback_query(F.data.startswith("compose:card:send"))
 async def card_send_invite(cb: CallbackQuery, state: FSMContext, session, bot: Bot) -> None:
-    data = await state.get_data()
-    user = await get_or_create_user(session, tg_user_id=cb.from_user.id, tg_username=cb.from_user.username)
-    doc = await find_active_draft(session, user.id, data.get("document_id"))
-    if not doc or doc.status not in ("draft", "composing"):
-        await cb.answer(t("stage3.send.not_ready"), show_alert=True)
-        return
-    if free_contracts_left(user) <= 0:
-        await cb.answer(t("billing.soon", price=get_settings().contract_price_rub), show_alert=True)
-        return
-    token, _ = await create_invite(session, doc, user.id)
-    await bump_free_contract_usage(session, user)
-    me = await bot.get_me()
-    link = invite_link(me.username or "", token)
-    deal = doc.deal or {}
-    prof = await load_draft_from_db(session, user.id)
-    name = prof.full_name or cb.from_user.full_name or "—"
-    price = format_price_rub(int(deal["price"])) if deal.get("price") else "—"
-    share = t("stage3.send.share_text", name=name, services=deal.get("services", "—"), price=price, link=link)
-    await cb.message.answer(t("stage3.send.done", link=link))
-    await cb.message.answer(share)
-    await cb.message.edit_reply_markup(reply_markup=send_invite_card_keyboard())
-    await cb.answer()
+    await send_invite_from_card(cb, state, session, bot)
 
 
 @router.callback_query(F.data.startswith("sign:begin:"))

@@ -22,9 +22,9 @@ def build_stage1_dispatcher() -> Dispatcher:
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(errors_router)
     dp.include_router(start_router)
+    dp.include_router(stage3_router)
     dp.include_router(compose_router)
     dp.include_router(onboarding_router)
-    dp.include_router(stage3_router)
     dp.include_router(menu_router)
     dp.include_router(fallback_router)
     return dp

@@ -7,11 +7,14 @@ from aiogram.types import Update
 
 from closer.bot.stage1_polling import build_stage1_bot, build_stage1_dispatcher
 from closer.config import get_settings
+from closer.db.init_db import ensure_schema
+from closer.db.session import _engine
 
 logger = logging.getLogger(__name__)
 
 _bot: Bot | None = None
 _dp: Dispatcher | None = None
+_schema_ready = False
 
 
 def build_dispatcher() -> tuple[Bot, Dispatcher]:
@@ -25,12 +28,16 @@ def build_dispatcher() -> tuple[Bot, Dispatcher]:
 
     _bot = build_stage1_bot(settings.bot_token)
     _dp = build_stage1_dispatcher()
-    logger.info("Stage-1 dispatcher initialized")
+    logger.info("Dispatcher initialized (stages 1–3)")
     return _bot, _dp
 
 
 async def process_update(data: dict) -> None:
+    global _schema_ready
     bot, dp = build_dispatcher()
+    if not _schema_ready:
+        await ensure_schema(_engine)
+        _schema_ready = True
     update = Update.model_validate(data, context={"bot": bot})
     await dp.feed_update(bot, update)
 
